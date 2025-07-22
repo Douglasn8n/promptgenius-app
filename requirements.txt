@@ -4,3 +4,4 @@ Flask-JWT-Extended
 Flask-Cors
 Werkzeug
 gunicorn
+stripe
