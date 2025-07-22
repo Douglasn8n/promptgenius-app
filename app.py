@@ -1,5 +1,6 @@
 import os
 import stripe
+import logging
 from flask import Flask, request, jsonify, send_from_directory, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
@@ -9,6 +10,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # --- CONFIGURAÇÃO ---
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+
+# Configuração do Logging para depuração no servidor
+logging.basicConfig(level=logging.INFO)
 
 # Configuração do CORS
 CORS(app, resources={r"/api/*": {"origins": "*"}}) 
@@ -78,6 +82,7 @@ def register():
     try:
         customer = stripe.Customer.create(email=email)
     except Exception as e:
+        app.logger.error(f"Erro no Stripe ao criar cliente: {e}")
         return jsonify({"msg": "Erro ao criar cliente no sistema de pagamento.", "error": str(e)}), 500
 
     new_user = User(email=email, stripe_customer_id=customer.id)
@@ -97,7 +102,7 @@ def login():
     user = User.query.filter_by(email=email).first()
 
     if user and user.check_password(password):
-        access_token = create_access_token(identity={'email': user.email, 'tier': user.tier, 'id': user.id})
+        access_token = create_access_token(identity=user.email) # Simplificado para usar apenas o email como identidade
         return jsonify(access_token=access_token)
     
     return jsonify({"msg": "Email ou senha inválidos."}), 401
@@ -106,14 +111,18 @@ def login():
 @jwt_required()
 def get_user_data():
     """Retorna dados do utilizador logado, incluindo o seu tier."""
-    user_identity = get_jwt_identity()
-    # CORREÇÃO: Procurar o utilizador pelo email, que é o identificador único no token.
-    user = User.query.filter_by(email=user_identity['email']).first()
+    app.logger.info(f"A rota /api/user foi acedida com os cabeçalhos: {request.headers}")
+    
+    current_user_email = get_jwt_identity()
+    user = User.query.filter_by(email=current_user_email).first()
+    
     if user:
         return jsonify({
             "email": user.email,
             "tier": user.tier
         })
+    
+    app.logger.warning(f"Utilizador não encontrado no /api/user para o email: {current_user_email}")
     return jsonify({"msg": "Utilizador não encontrado"}), 404
 
 
@@ -126,8 +135,8 @@ def create_checkout_session():
     data = request.get_json()
     plan_id = data.get('planId')
     
-    user_identity = get_jwt_identity()
-    user = User.query.filter_by(email=user_identity['email']).first()
+    current_user_email = get_jwt_identity()
+    user = User.query.filter_by(email=current_user_email).first()
 
     if not user or not user.stripe_customer_id:
         return jsonify({"msg": "Utilizador ou cliente de pagamento não encontrado."}), 404
@@ -140,10 +149,11 @@ def create_checkout_session():
             mode='subscription',
             success_url=app.config['DOMAIN_URL'] + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=app.config['DOMAIN_URL'],
-            metadata={'user_id': user.id} # Passa o ID do utilizador para o webhook
+            metadata={'user_id': user.id}
         )
         return jsonify({'sessionId': checkout_session.id, 'url': checkout_session.url})
     except Exception as e:
+        app.logger.error(f"Erro no Stripe ao criar checkout session: {e}")
         return jsonify({'error': {'message': str(e)}}), 500
 
 
@@ -155,16 +165,17 @@ def stripe_webhook():
     endpoint_secret = app.config['STRIPE_WEBHOOK_SECRET']
     event = None
 
+    if not endpoint_secret:
+        app.logger.warning("STRIPE_WEBHOOK_SECRET não está configurado.")
+        return 'Webhook secret não configurado', 500
+
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
     except ValueError as e:
-        # Invalid payload
-        return 'Invalid payload', 400
+        return 'Payload inválido', 400
     except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        return 'Invalid signature', 400
+        return 'Assinatura inválida', 400
 
-    # Lida com o evento checkout.session.completed
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
         user_id = session.get('metadata', {}).get('user_id')
@@ -172,23 +183,19 @@ def stripe_webhook():
         if user_id:
             user = User.query.get(user_id)
             if user:
-                # Obtém o ID do preço da subscrição
-                # Esta lógica pode precisar de ajuste dependendo da sua configuração exata no Stripe
                 try:
                     line_items = stripe.checkout.Session.list_line_items(session.id, limit=1)
                     price_id = line_items.data[0].price.id
                     
-                    # Atualiza o tier do utilizador com base no plano subscrito
                     if price_id == app.config['STRIPE_BASIC_PLAN_ID']:
                         user.tier = 'basico'
                     elif price_id == app.config['STRIPE_PRO_PLAN_ID']:
                         user.tier = 'profissional'
                     
                     db.session.commit()
-                    print(f"Utilizador {user.email} atualizado para o tier {user.tier}")
+                    app.logger.info(f"Utilizador {user.email} atualizado para o tier {user.tier}")
                 except Exception as e:
-                    print(f"Erro ao processar webhook para a sessão {session.id}: {str(e)}")
-
+                    app.logger.error(f"Erro ao processar webhook para a sessão {session.id}: {str(e)}")
 
     return 'Success', 200
 
@@ -199,5 +206,4 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
-    # Esta parte é para rodar localmente. O Render/Gunicorn usará o objeto 'app'.
     app.run(debug=False, port=5000)
