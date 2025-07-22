@@ -1,6 +1,0 @@
-Flask
-Flask-SQLAlchemy
-Flask-JWT-Extended
-Flask-Cors
-Werkzeug
-gunicorn
