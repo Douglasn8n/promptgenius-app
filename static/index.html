@@ -212,14 +212,12 @@
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         
-                        // Adicionado para obter a resposta como texto em caso de erro
                         if (!response.ok) {
                             const errorText = await response.text();
                             throw new Error(`Token inválido ou erro no servidor: ${errorText}`);
                         }
                         
                         const userData = await response.json();
-                        console.log("Dados do utilizador recebidos:", userData); // Adicionado para depuração
                         state.currentUser = userData;
                         
                         authLinks.classList.add('hidden-view');
@@ -229,8 +227,7 @@
                         showView('generator');
                     } catch (error) {
                         console.error("Erro ao validar token:", error);
-                        // Adicionado um alerta para feedback ao utilizador
-                        alert("A sua sessão expirou ou ocorreu um erro. Por favor, faça login novamente. Verifique a consola para mais detalhes.");
+                        alert("A sua sessão expirou ou ocorreu um erro. Por favor, faça login novamente.");
                         handleLogout();
                     }
                 } else {
@@ -324,9 +321,13 @@
 
             // --- LÓGICA DO GERADOR (RESTAURADA) ---
             const db = {
+                // CORREÇÃO: Lista de plataformas completa
                 platforms: [
                     { id: 'midjourney', name: 'Midjourney', params: { ar: '--ar', v: '--v', style: '--style', stylize: '--stylize', q: '--q' } },
                     { id: 'leonardo', name: 'Leonardo.ai', params: { alchemy: '[Alchemy]', photoReal: '[PhotoReal]', guidance: '[Guidance Scale: {value}]' } },
+                    { id: 'veo3', name: 'Veo 3 (Vídeo)', params: {} },
+                    { id: 'dalle3', name: 'Chat GPT (DALL-E 3)', params: {} },
+                    { id: 'imagen3', name: 'Gemini (Imagen 3)', params: {} }
                 ],
                 tabs: [
                     { id: 'subject', name: 'Assunto' }, { id: 'style', name: 'Estilo' }, { id: 'composition', name: 'Composição' }, { id: 'details', name: 'Detalhes' }
@@ -348,12 +349,19 @@
             const advancedToggle = document.getElementById('advanced-toggle');
 
             function initGenerator() {
+                // Limpa opções antigas para evitar duplicados
+                platformSelect.innerHTML = '';
                 db.platforms.forEach(p => {
                     const option = document.createElement('option');
                     option.value = p.id;
                     option.textContent = p.name;
                     platformSelect.appendChild(option);
                 });
+                
+                // Limpa abas e conteúdo antigos
+                tabsContainer.innerHTML = '';
+                tabsContent.innerHTML = '';
+
                 db.tabs.forEach((tab, index) => {
                     const button = document.createElement('button');
                     button.id = `tab-button-${tab.id}`;
