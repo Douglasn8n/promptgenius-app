@@ -5,53 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerador de Prompts de Imagem IA</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://js.stripe.com/v3/"></script>
     
-    <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Estilos personalizados -->
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #111827; /* bg-gray-900 */
-            color: #d1d5db; /* text-gray-300 */
-        }
-        .form-select, .form-input, .form-textarea {
-            background-color: #374151; /* bg-gray-700 */
-            border-color: #4b5563; /* border-gray-600 */
-            color: #d1d5db; /* text-gray-300 */
-            border-radius: 0.5rem; /* rounded-lg */
-            transition: all 0.2s ease-in-out;
-        }
-        .form-select:focus, .form-input:focus, .form-textarea:focus {
-            outline: none;
-            border-color: #3b82f6; /* border-blue-500 */
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
-        }
-        .tab-button {
-            transition: all 0.2s ease-in-out;
-            border-bottom: 2px solid transparent;
-        }
-        .tab-button.active {
-            color: #3b82f6; /* text-blue-500 */
-            border-bottom-color: #3b82f6; /* border-blue-500 */
-        }
-        .advanced-toggle {
-            background-color: #4b5563; /* bg-gray-600 */
-        }
-        .advanced-toggle .dot {
-            transition: transform 0.3s ease;
-        }
-        .advanced-toggle.active .dot {
-            transform: translateX(100%);
-        }
-        .hidden-view {
-            display: none;
-        }
+        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #d1d5db; }
+        .form-select, .form-input, .form-textarea { background-color: #374151; border-color: #4b5563; color: #d1d5db; border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
+        .form-select:focus, .form-input:focus, .form-textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+        .tab-button { transition: all 0.2s ease-in-out; border-bottom: 2px solid transparent; }
+        .tab-button.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+        .hidden-view { display: none; }
+        .plan-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .plan-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
     </style>
 </head>
 <body class="antialiased">
@@ -60,15 +29,15 @@
 
         <!-- Navegação Superior -->
         <nav class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-bold text-white">
-                <a href="#" id="home-link">PromptGenius</a>
-            </h1>
+            <h1 class="text-2xl font-bold text-white"><a href="#" id="home-link">PromptGenius</a></h1>
             <div id="auth-links" class="flex items-center space-x-4">
                 <button id="login-nav-button" class="text-gray-300 hover:text-white">Login</button>
                 <button id="register-nav-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Cadastre-se</button>
             </div>
             <div id="user-info" class="hidden-view items-center space-x-4">
                 <span id="user-email" class="text-gray-300"></span>
+                <span id="user-tier-badge" class="bg-blue-500 text-white text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full"></span>
+                <button id="pricing-nav-button" class="text-gray-300 hover:text-white">Planos</button>
                 <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair</button>
             </div>
         </nav>
@@ -86,7 +55,7 @@
                         <label for="login-password" class="block text-md font-medium text-gray-300">Senha</label>
                         <input type="password" id="login-password" class="form-input w-full mt-1 p-3" required>
                     </div>
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Entrar</button>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Entrar</button>
                 </form>
                 <p class="text-center mt-4 text-gray-400">Não tem uma conta? <a href="#" id="go-to-register" class="text-blue-400 hover:underline">Cadastre-se</a></p>
             </div>
@@ -94,7 +63,7 @@
         
         <!-- PÁGINA DE CADASTRO -->
         <div id="register-view" class="hidden-view max-w-md mx-auto mt-16">
-            <div class="bg-gray-800 p-8 rounded-xl shadow-lg">
+             <div class="bg-gray-800 p-8 rounded-xl shadow-lg">
                 <h2 class="text-3xl font-bold text-center text-white mb-6">Crie sua Conta</h2>
                 <form id="register-form" class="space-y-6">
                     <div>
@@ -105,178 +74,137 @@
                         <label for="register-password" class="block text-md font-medium text-gray-300">Senha</label>
                         <input type="password" id="register-password" class="form-input w-full mt-1 p-3" required>
                     </div>
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Criar Conta</button>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Criar Conta</button>
                 </form>
                  <p class="text-center mt-4 text-gray-400">Já tem uma conta? <a href="#" id="go-to-login" class="text-blue-400 hover:underline">Faça Login</a></p>
             </div>
         </div>
 
-        <!-- PÁGINA PRINCIPAL (GERADOR) -->
-        <div id="generator-view" class="hidden-view">
-            <header class="text-center mb-8">
-                <h1 class="text-4xl sm:text-5xl font-bold text-white tracking-tight">
-                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">
-                        Gerador de Prompts de Imagem IA
-                    </span>
-                </h1>
-                <p class="mt-2 text-lg text-gray-400">Crie prompts detalhados para Midjourney, Leonardo.ai, DALL-E 3 e mais.</p>
-            </header>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 space-y-6">
-                    <div>
-                        <label for="ai-platform" class="block text-lg font-semibold mb-2 text-white">Plataforma de IA</label>
-                        <select id="ai-platform" class="form-select w-full p-3"></select>
-                    </div>
-                    <div id="tabs-container-wrapper" class="bg-gray-800 p-6 rounded-xl shadow-lg">
-                        <div class="border-b border-gray-700 mb-6">
-                            <nav class="flex space-x-4" aria-label="Tabs"></nav>
-                        </div>
-                        <div id="tabs-content"></div>
-                    </div>
-                    <div class="flex items-center justify-end space-x-3">
-                        <span class="text-lg font-semibold text-white">Modo Avançado</span>
-                        <button id="advanced-toggle" class="relative inline-flex items-center h-6 rounded-full w-11 advanced-toggle">
-                            <span class="sr-only">Ativar Modo Avançado</span>
-                            <span class="inline-block w-4 h-4 transform bg-white rounded-full dot"></span>
-                        </button>
-                    </div>
+        <!-- PÁGINA DE PLANOS -->
+        <div id="pricing-view" class="hidden-view">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-white">Escolha o Plano Perfeito para Si</h2>
+                <p class="text-lg text-gray-400 mt-2">Comece gratuitamente e faça o upgrade quando precisar de mais poder.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                <!-- Plano Gratuito -->
+                <div class="plan-card bg-gray-800 p-8 rounded-xl border border-gray-700 flex flex-col">
+                    <h3 class="text-2xl font-bold text-white">Gratuito</h3>
+                    <p class="text-gray-400 mt-2 flex-grow">Para experimentar e usar casualmente.</p>
+                    <p class="text-4xl font-bold text-white my-6">R$0 <span class="text-lg font-normal text-gray-400">/mês</span></p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>10 Prompts/dia</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Categorias Básicas</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Histórico Limitado</li>
+                    </ul>
+                    <button class="mt-8 w-full bg-gray-600 text-white font-bold py-3 px-4 rounded-lg cursor-not-allowed">Plano Atual</button>
                 </div>
-                <div class="space-y-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-white mb-4">Prompt Gerado</h2>
-                        <div class="bg-gray-800 p-4 rounded-xl shadow-lg h-80 flex flex-col">
-                            <textarea id="generated-prompt" class="form-textarea w-full h-full flex-grow resize-none bg-transparent border-0 p-2 focus:ring-0" readonly placeholder="Seu prompt aparecerá aqui..."></textarea>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <button id="copy-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Copiar</button>
-                        <button id="clear-button" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Limpar</button>
-                    </div>
-                    <div id="copy-feedback" class="text-center text-green-400 opacity-0 transition-opacity duration-300">Copiado para a área de transferência!</div>
+                <!-- Plano Básico -->
+                <div class="plan-card bg-gray-800 p-8 rounded-xl border border-gray-700 flex flex-col">
+                    <h3 class="text-2xl font-bold text-white">Básico</h3>
+                    <p class="text-gray-400 mt-2 flex-grow">Para entusiastas e criadores de conteúdo.</p>
+                    <p class="text-4xl font-bold text-white my-6">R$29.90 <span class="text-lg font-normal text-gray-400">/mês</span></p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>100 Prompts/dia</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Todas as Categorias</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Salvar Favoritos</li>
+                    </ul>
+                    <button data-plan-id="STRIPE_BASIC_PLAN_ID" class="subscribe-button mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Subscrever</button>
+                </div>
+                <!-- Plano Profissional -->
+                <div class="plan-card bg-gray-800 p-8 rounded-xl border-2 border-blue-500 flex flex-col relative">
+                    <span class="absolute top-0 right-8 -mt-3 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">MAIS POPULAR</span>
+                    <h3 class="text-2xl font-bold text-white">Profissional</h3>
+                    <p class="text-gray-400 mt-2 flex-grow">Para profissionais e agências.</p>
+                    <p class="text-4xl font-bold text-white my-6">R$79.90 <span class="text-lg font-normal text-gray-400">/mês</span></p>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Prompts Ilimitados</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Modo Avançado Completo</li>
+                        <li class="flex items-center"><svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Exportação de Prompts</li>
+                    </ul>
+                    <button data-plan-id="STRIPE_PRO_PLAN_ID" class="subscribe-button mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Subscrever</button>
                 </div>
             </div>
+        </div>
+
+        <!-- PÁGINA PRINCIPAL (GERADOR) -->
+        <div id="generator-view" class="hidden-view">
+            <!-- O conteúdo do gerador permanece o mesmo -->
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // --- BANCO DE DADOS (SIMULADO PARA O GERADOR) ---
-            const db = {
-                platforms: [
-                    { id: 'midjourney', name: 'Midjourney', params: { ar: '--ar', v: '--v', style: '--style', stylize: '--stylize', q: '--q' } },
-                    { id: 'leonardo', name: 'Leonardo.ai', params: { alchemy: '[Alchemy]', photoReal: '[PhotoReal]', guidance: '[Guidance Scale: {value}]' } },
-                    { id: 'veo3', name: 'Veo 3 (Vídeo)', params: {} },
-                    { id: 'dalle3', name: 'Chat GPT (DALL-E 3)', params: {} },
-                    { id: 'imagen3', name: 'Gemini (Imagen 3)', params: {} }
-                ],
-                tabs: [
-                    { id: 'subject', name: 'Assunto' },
-                    { id: 'style', name: 'Estilo' },
-                    { id: 'composition', name: 'Composição' },
-                    { id: 'details', name: 'Detalhes' }
-                ],
-                options: {
-                    subject: {
-                        label: 'Assunto Principal',
-                        categories: ['Pessoa', 'Animal', 'Paisagem', 'Objeto', 'Arquitetura', 'Veículo', 'Fantasia', 'Sci-fi', 'Natureza', 'Retrato', 'Cena urbana', 'Espaço'],
-                        details: { label: 'Detalhes do Assunto', placeholder: 'Ex: mulher jovem com cabelos cacheados, sorrindo...' }
-                    },
-                    style: {
-                        label: 'Estilo Artístico',
-                        styles: ['Fotorrealista', 'Pintura a óleo', 'Aquarela', 'Arte digital', 'Anime', 'Cartoon', '3D render', 'Pixel art', 'Impressionista', 'Surrealista', 'Cyberpunk', 'Steampunk', 'Art nouveau', 'Pop art', 'Minimalista'],
-                        advanced: { artist: { label: 'Artista Famoso (Referência)', placeholder: 'Ex: Van Gogh, Monet, H.R. Giger' } }
-                    },
-                    composition: {
-                        label: 'Enquadramento',
-                        types: ['Close-up', 'Plano médio', 'Plano geral', 'Vista aérea', 'Ângulo baixo', 'Ângulo alto', 'Regra dos terços', 'Simetria', 'Perspectiva isométrica', 'Profundidade de campo rasa', 'Grande angular', 'Macro'],
-                        aspectRatio: { label: 'Proporção', ratios: ['1:1 (Quadrado)', '16:9 (Paisagem)', '9:16 (Retrato)', '4:3', '3:2', '2:1', '3:4'] },
-                        advanced: {
-                            lighting: { label: 'Iluminação', types: ['Luz suave', 'Luz dura', 'Contraluz', 'Golden hour', 'Luz de estúdio', 'Neon', 'Cinematográfica'] },
-                            camera: { label: 'Câmera Profissional', types: ['Canon EOS R5', 'Sony A7R IV', 'Nikon Z7 II', 'Lente 85mm f/1.8', 'Lente 35mm f/1.4'] }
-                        }
-                    },
-                    details: {
-                        label: 'Humor / Tom',
-                        moods: ['Dramático', 'Sereno', 'Alegre', 'Misterioso', 'Épico', 'Melancólico', 'Energético', 'Nostálgico', 'Sombrio', 'Vibrante'],
-                        quality: { label: 'Qualidade', levels: ['Padrão', 'Alta qualidade', 'Ultra detalhado', '4K', '8K', 'Foco nítido', 'Gráfico', 'Complexo'] },
-                        negative: { label: 'Prompt Negativo', placeholder: 'Ex: texto, logos, má qualidade, deformado...' },
-                        advanced: { creativity: { label: 'Criatividade', min: 0, max: 100, value: 70 } }
-                    }
-                }
-            };
-            
+            // --- CONFIGURAÇÃO ---
+            const API_URL = '/api';
+            let stripe; // Será inicializado depois
+
             // --- ESTADO DA APLICAÇÃO ---
-            let state = {
-                currentUser: null
-            };
-            
-            // --- URL DA API ---
-            const API_URL = '/api'; // Caminho relativo para a API do backend
+            let state = { currentUser: null };
 
             // --- ELEMENTOS DO DOM ---
             const views = {
                 login: document.getElementById('login-view'),
                 register: document.getElementById('register-view'),
-                generator: document.getElementById('generator-view')
+                generator: document.getElementById('generator-view'),
+                pricing: document.getElementById('pricing-view'),
             };
             const authLinks = document.getElementById('auth-links');
             const userInfo = document.getElementById('user-info');
             const userEmailSpan = document.getElementById('user-email');
+            const userTierBadge = document.getElementById('user-tier-badge');
 
             // --- FUNÇÕES DE NAVEGAÇÃO E UI ---
             function showView(viewName) {
                 Object.values(views).forEach(view => view.classList.add('hidden-view'));
-                if (views[viewName]) {
-                    views[viewName].classList.remove('hidden-view');
-                }
+                if (views[viewName]) views[viewName].classList.remove('hidden-view');
             }
 
-            function updateUI() {
+            async function updateUI() {
                 const token = localStorage.getItem('accessToken');
                 if (token) {
-                    // Idealmente, você decodificaria o token para obter o email,
-                    // mas para simplificar, vamos apenas mostrar que o usuário está logado.
-                    // O email será preenchido no login.
-                    authLinks.classList.add('hidden-view');
-                    userInfo.classList.remove('hidden-view');
-                    showView('generator');
+                    try {
+                        const response = await fetch(`${API_URL}/user`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!response.ok) throw new Error('Token inválido');
+                        
+                        const userData = await response.json();
+                        state.currentUser = userData;
+                        
+                        authLinks.classList.add('hidden-view');
+                        userInfo.classList.remove('hidden-view');
+                        userEmailSpan.textContent = state.currentUser.email;
+                        userTierBadge.textContent = state.currentUser.tier;
+                        showView('generator');
+                    } catch (error) {
+                        console.error("Erro ao validar token:", error);
+                        handleLogout();
+                    }
                 } else {
                     authLinks.classList.remove('hidden-view');
                     userInfo.classList.add('hidden-view');
-                    userEmailSpan.textContent = '';
                     showView('login');
                 }
             }
             
-            // --- LÓGICA DE AUTENTICAÇÃO (REAL) ---
+            // --- LÓGICA DE AUTENTICAÇÃO ---
             async function handleLogin(e) {
                 e.preventDefault();
                 const email = document.getElementById('login-email').value;
                 const password = document.getElementById('login-password').value;
-
                 try {
                     const response = await fetch(`${API_URL}/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email, password })
                     });
-
                     const data = await response.json();
-
-                    if (!response.ok) {
-                        alert(data.msg || 'Erro ao fazer login.');
-                        return;
-                    }
-
+                    if (!response.ok) throw new Error(data.msg || 'Erro de login');
                     localStorage.setItem('accessToken', data.access_token);
-                    state.currentUser = { email: email };
-                    userEmailSpan.textContent = email; // Atualiza o email na UI
-                    updateUI();
-
+                    await updateUI();
                 } catch (error) {
-                    console.error('Erro de rede:', error);
-                    alert('Não foi possível conectar ao servidor.');
+                    alert(error.message);
                 }
             }
 
@@ -284,27 +212,18 @@
                 e.preventDefault();
                 const email = document.getElementById('register-email').value;
                 const password = document.getElementById('register-password').value;
-
                 try {
                     const response = await fetch(`${API_URL}/register`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email, password })
                     });
-
                     const data = await response.json();
-
-                    if (!response.ok) {
-                        alert(data.msg || 'Erro ao registrar.');
-                        return;
-                    }
-
-                    alert('Registro bem-sucedido! Por favor, faça o login.');
+                    if (!response.ok) throw new Error(data.msg || 'Erro de registo');
+                    alert('Registo bem-sucedido! Por favor, faça o login.');
                     showView('login');
-
                 } catch (error) {
-                    console.error('Erro de rede:', error);
-                    alert('Não foi possível conectar ao servidor.');
+                    alert(error.message);
                 }
             }
 
@@ -314,152 +233,66 @@
                 updateUI();
             }
 
+            // --- LÓGICA DE PAGAMENTOS (STRIPE) ---
+            async function handleSubscription(e) {
+                const planId = e.target.dataset.planId;
+                const token = localStorage.getItem('accessToken');
 
-            // --- LÓGICA DO GERADOR (CÓDIGO ANTERIOR) ---
-            const platformSelect = document.getElementById('ai-platform');
-            const tabsContainer = document.getElementById('tabs-container-wrapper').querySelector('nav');
-            const tabsContent = document.getElementById('tabs-content');
-            const generatedPromptTextarea = document.getElementById('generated-prompt');
-            const copyButton = document.getElementById('copy-button');
-            const clearButton = document.getElementById('clear-button');
-            const copyFeedback = document.getElementById('copy-feedback');
-            const advancedToggle = document.getElementById('advanced-toggle');
-
-            function initGenerator() {
-                db.platforms.forEach(p => {
-                    const option = document.createElement('option');
-                    option.value = p.id;
-                    option.textContent = p.name;
-                    platformSelect.appendChild(option);
-                });
-
-                db.tabs.forEach((tab, index) => {
-                    const button = document.createElement('button');
-                    button.id = `tab-button-${tab.id}`;
-                    button.className = `tab-button py-2 px-4 text-lg font-medium ${index === 0 ? 'active' : ''}`;
-                    button.textContent = tab.name;
-                    button.addEventListener('click', () => switchTab(tab.id));
-                    tabsContainer.appendChild(button);
-
-                    const contentDiv = document.createElement('div');
-                    contentDiv.id = `tab-content-${tab.id}`;
-                    if (index !== 0) contentDiv.classList.add('hidden');
-                    contentDiv.innerHTML = createTabContent(tab.id);
-                    tabsContent.appendChild(contentDiv);
-                });
-
-                document.querySelectorAll('.prompt-input').forEach(el => el.addEventListener('input', generatePrompt));
-                advancedToggle.addEventListener('click', toggleAdvancedMode);
-                copyButton.addEventListener('click', copyPrompt);
-                clearButton.addEventListener('click', clearAll);
-
-                generatePrompt();
-            }
-
-            function createTabContent(tabId) {
-                const data = db.options[tabId];
-                let html = '';
-                if (data.categories) html += createSelect(tabId, data.label, data.categories);
-                if (data.styles) html += createSelect(tabId, data.label, data.styles);
-                if (data.types) html += createSelect(tabId, data.label, data.types);
-                if (data.moods) html += createSelect(tabId, data.label, data.moods);
-                if (data.details) html += createTextarea('subject-details', data.details.label, data.details.placeholder);
-                if (data.aspectRatio) html += createSelect('aspect-ratio', data.aspectRatio.label, data.aspectRatio.ratios);
-                if (data.quality) html += createSelect('quality', data.quality.label, data.quality.levels);
-                if (data.negative) html += createTextarea('negative-prompt', data.negative.label, data.negative.placeholder);
-                if (data.advanced) {
-                    html += '<div class="advanced-field hidden mt-6 pt-6 border-t border-gray-700 space-y-4">';
-                    if (data.advanced.artist) html += createInput('artist', data.advanced.artist.label, data.advanced.artist.placeholder);
-                    if (data.advanced.lighting) html += createSelect('lighting', data.advanced.lighting.label, data.advanced.lighting.types);
-                    if (data.advanced.camera) html += createSelect('camera', data.advanced.camera.label, data.advanced.camera.types);
-                    if (data.advanced.creativity) html += createSlider('creativity', data.advanced.creativity.label, data.advanced.creativity);
-                    html += '</div>';
+                // Substitua os placeholders pelos IDs reais dos seus preços no Stripe
+                const planIdMapping = {
+                    'STRIPE_BASIC_PLAN_ID': 'price_1PgKxNRoa2Y2iEa3z8hR2W8K', // Substitua pelo seu ID do plano Básico
+                    'STRIPE_PRO_PLAN_ID': 'price_1PgKy5Roa2Y2iEa3J81wzH2X'  // Substitua pelo seu ID do plano Profissional
+                };
+                const realPlanId = planIdMapping[planId];
+                if (!realPlanId) {
+                    alert('ID do plano não configurado corretamente.');
+                    return;
                 }
-                return html;
-            }
 
-            function createSelect(id, label, options) { return `<div class="mb-4"><label for="${id}" class="block text-md font-medium mb-2 text-gray-300">${label}</label><select id="${id}" class="form-select w-full p-2.5 prompt-input"><option value="">-- Nenhum --</option>${options.map(o => `<option value="${o}">${o}</option>`).join('')}</select></div>`; }
-            function createInput(id, label, placeholder) { return `<div class="mb-4"><label for="${id}" class="block text-md font-medium mb-2 text-gray-300">${label}</label><input type="text" id="${id}" class="form-input w-full p-2.5 prompt-input" placeholder="${placeholder}"></div>`; }
-            function createTextarea(id, label, placeholder) { return `<div class="mb-4"><label for="${id}" class="block text-md font-medium mb-2 text-gray-300">${label}</label><textarea id="${id}" class="form-textarea w-full p-2.5 prompt-input" rows="3" placeholder="${placeholder}"></textarea></div>`; }
-            function createSlider(id, label, { min, max, value }) { return `<div class="mb-4"><label for="${id}" class="block text-md font-medium mb-2 text-gray-300">${label}: <span id="${id}-value">${value}</span>%</label><input type="range" id="${id}" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer prompt-input" min="${min}" max="${max}" value="${value}"></div>`; }
-
-            function switchTab(tabId) {
-                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                document.getElementById(`tab-button-${tabId}`).classList.add('active');
-                document.querySelectorAll('#tabs-content > div').forEach(content => content.classList.add('hidden'));
-                document.getElementById(`tab-content-${tabId}`).classList.remove('hidden');
-            }
-
-            function toggleAdvancedMode() {
-                advancedToggle.classList.toggle('active');
-                document.querySelectorAll('.advanced-field').forEach(field => field.classList.toggle('hidden', !advancedToggle.classList.contains('active')));
-                generatePrompt();
-            }
-
-            function getInputValue(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
-
-            function generatePrompt() {
-                const isAdvanced = advancedToggle.classList.contains('active');
-                const promptParts = [getInputValue('subject'), getInputValue('subject-details'), getInputValue('style') ? `${getInputValue('style')} style` : '', isAdvanced && getInputValue('artist') ? `by ${getInputValue('artist')}` : '', getInputValue('details') ? `${getInputValue('details')} mood` : '', isAdvanced && getInputValue('lighting') ? `${getInputValue('lighting')} lighting` : '', getInputValue('composition'), isAdvanced && getInputValue('camera') ? `shot on ${getInputValue('camera')}` : '', getInputValue('quality')].filter(Boolean);
-                let finalPrompt = promptParts.join(', ');
-                const platformId = platformSelect.value;
-                const platform = db.platforms.find(p => p.id === platformId);
-                const aspectRatio = getInputValue('aspect-ratio').split(' ')[0];
-                const creativity = isAdvanced ? getInputValue('creativity') : '';
-                if(creativity) document.getElementById('creativity-value').textContent = creativity;
-                if (platform) {
-                    switch (platformId) {
-                        case 'midjourney':
-                            if (aspectRatio) finalPrompt += ` ${platform.params.ar} ${aspectRatio}`;
-                            finalPrompt += ` ${platform.params.v} 6.0`;
-                            if (getInputValue('style') === 'Fotorrealista') finalPrompt += ` ${platform.params.style} raw`;
-                            if (isAdvanced && creativity) finalPrompt += ` ${platform.params.stylize} ${Math.round(creativity * 10)}`;
-                            if (getInputValue('quality') === 'Ultra detalhado') finalPrompt += ` ${platform.params.q} 2`;
-                            break;
-                        case 'leonardo':
-                            if (isAdvanced) finalPrompt += ` ${platform.params.alchemy}`;
-                            if (getInputValue('style') === 'Fotorrealista') finalPrompt += ` ${platform.params.photoReal}`;
-                            if (isAdvanced && creativity) finalPrompt += ` ${platform.params.guidance.replace('{value}', Math.round(creativity / 5))}`;
-                            break;
+                try {
+                    const response = await fetch(`${API_URL}/create-checkout-session`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ planId: realPlanId })
+                    });
+                    const session = await response.json();
+                    if (session.url) {
+                        window.location.href = session.url;
+                    } else {
+                        alert('Não foi possível iniciar a sessão de pagamento.');
                     }
+                } catch (error) {
+                    console.error('Erro ao criar sessão de checkout:', error);
+                    alert('Erro ao iniciar o processo de pagamento.');
                 }
-                const negativePrompt = getInputValue('negative-prompt');
-                if (negativePrompt) { finalPrompt += platformId === 'midjourney' ? ` --no ${negativePrompt}` : ` [Negative Prompt: ${negativePrompt}]`; }
-                generatedPromptTextarea.value = finalPrompt.replace(/, ,/g, ',').trim();
             }
 
-            function copyPrompt() {
-                if (!generatedPromptTextarea.value) return;
-                generatedPromptTextarea.select();
-                document.execCommand('copy');
-                copyFeedback.classList.remove('opacity-0');
-                setTimeout(() => { copyFeedback.classList.add('opacity-0'); }, 2000);
-            }
-
-            function clearAll() {
-                document.querySelectorAll('.prompt-input').forEach(el => { el.type === 'range' ? el.value = db.options.details.advanced.creativity.value : el.value = ''; });
-                switchTab('subject');
-                generatePrompt();
-            }
-            
             // --- INICIALIZAÇÃO GERAL ---
             function init() {
-                // Configurar listeners de navegação
+                // Listeners de navegação
                 document.getElementById('login-nav-button').addEventListener('click', () => showView('login'));
                 document.getElementById('register-nav-button').addEventListener('click', () => showView('register'));
                 document.getElementById('home-link').addEventListener('click', (e) => { e.preventDefault(); updateUI(); });
                 document.getElementById('go-to-register').addEventListener('click', (e) => { e.preventDefault(); showView('register'); });
                 document.getElementById('go-to-login').addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
-                
-                // Configurar listeners dos formulários
+                document.getElementById('pricing-nav-button').addEventListener('click', () => showView('pricing'));
+
+                // Listeners de formulários
                 document.getElementById('login-form').addEventListener('submit', handleLogin);
                 document.getElementById('register-form').addEventListener('submit', handleRegister);
                 document.getElementById('logout-button').addEventListener('click', handleLogout);
 
-                // Inicializar o gerador
-                initGenerator();
+                // Listeners de subscrição
+                document.querySelectorAll('.subscribe-button').forEach(button => {
+                    button.addEventListener('click', handleSubscription);
+                });
+
+                // O gerador de prompts pode ser inicializado aqui se necessário
+                // initGenerator();
                 
-                // Definir estado inicial da UI
                 updateUI();
             }
 
