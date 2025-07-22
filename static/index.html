@@ -49,7 +49,6 @@
         .advanced-toggle.active .dot {
             transform: translateX(100%);
         }
-        /* Esconde elementos por padrão */
         .hidden-view {
             display: none;
         }
@@ -162,7 +161,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // --- BANCO DE DADOS (SIMULADO) ---
+            // --- BANCO DE DADOS (SIMULADO PARA O GERADOR) ---
             const db = {
                 platforms: [
                     { id: 'midjourney', name: 'Midjourney', params: { ar: '--ar', v: '--v', style: '--style', stylize: '--stylize', q: '--q' } },
@@ -209,8 +208,11 @@
             
             // --- ESTADO DA APLICAÇÃO ---
             let state = {
-                currentUser: null // ou { email: 'user@example.com' }
+                currentUser: null
             };
+            
+            // --- URL DA API ---
+            const API_URL = '/api'; // Caminho relativo para a API do backend
 
             // --- ELEMENTOS DO DOM ---
             const views = {
@@ -231,10 +233,13 @@
             }
 
             function updateUI() {
-                if (state.currentUser) {
+                const token = localStorage.getItem('accessToken');
+                if (token) {
+                    // Idealmente, você decodificaria o token para obter o email,
+                    // mas para simplificar, vamos apenas mostrar que o usuário está logado.
+                    // O email será preenchido no login.
                     authLinks.classList.add('hidden-view');
                     userInfo.classList.remove('hidden-view');
-                    userEmailSpan.textContent = state.currentUser.email;
                     showView('generator');
                 } else {
                     authLinks.classList.remove('hidden-view');
@@ -244,29 +249,67 @@
                 }
             }
             
-            // --- LÓGICA DE AUTENTICAÇÃO (SIMULADA) ---
-            function handleLogin(e) {
+            // --- LÓGICA DE AUTENTICAÇÃO (REAL) ---
+            async function handleLogin(e) {
                 e.preventDefault();
                 const email = document.getElementById('login-email').value;
-                // **FUTURO: Fazer fetch('POST', '/api/login', {email, password})**
-                // A API retornaria um token e dados do usuário.
-                console.log(`Tentativa de login com: ${email}`);
-                state.currentUser = { email: email }; // Simulação de sucesso
-                updateUI();
+                const password = document.getElementById('login-password').value;
+
+                try {
+                    const response = await fetch(`${API_URL}/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        alert(data.msg || 'Erro ao fazer login.');
+                        return;
+                    }
+
+                    localStorage.setItem('accessToken', data.access_token);
+                    state.currentUser = { email: email };
+                    userEmailSpan.textContent = email; // Atualiza o email na UI
+                    updateUI();
+
+                } catch (error) {
+                    console.error('Erro de rede:', error);
+                    alert('Não foi possível conectar ao servidor.');
+                }
             }
 
-            function handleRegister(e) {
+            async function handleRegister(e) {
                 e.preventDefault();
                 const email = document.getElementById('register-email').value;
-                // **FUTURO: Fazer fetch('POST', '/api/register', {email, password})**
-                // Após o registro, a API poderia logar o usuário automaticamente.
-                 console.log(`Tentativa de registro com: ${email}`);
-                state.currentUser = { email: email }; // Simulação de sucesso
-                updateUI();
+                const password = document.getElementById('register-password').value;
+
+                try {
+                    const response = await fetch(`${API_URL}/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        alert(data.msg || 'Erro ao registrar.');
+                        return;
+                    }
+
+                    alert('Registro bem-sucedido! Por favor, faça o login.');
+                    showView('login');
+
+                } catch (error) {
+                    console.error('Erro de rede:', error);
+                    alert('Não foi possível conectar ao servidor.');
+                }
             }
 
             function handleLogout() {
-                // **FUTURO: Invalidar o token no backend (opcional)**
+                localStorage.removeItem('accessToken');
                 state.currentUser = null;
                 updateUI();
             }
