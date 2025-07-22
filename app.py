@@ -15,11 +15,11 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Configuração do Banco de Dados
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'database.db'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Configuração do JWT
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default-super-secret-key')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'default-super-secret-key-for-dev')
 
 # Configuração do Stripe
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -75,7 +75,6 @@ def register():
     if User.query.filter_by(email=email).first():
         return jsonify({"msg": "Este email já está em uso."}), 409
 
-    # Cria um cliente no Stripe para o novo utilizador
     try:
         customer = stripe.Customer.create(email=email)
     except Exception as e:
@@ -108,7 +107,8 @@ def login():
 def get_user_data():
     """Retorna dados do utilizador logado, incluindo o seu tier."""
     user_identity = get_jwt_identity()
-    user = User.query.get(user_identity['id'])
+    # CORREÇÃO: Procurar o utilizador pelo email, que é o identificador único no token.
+    user = User.query.filter_by(email=user_identity['email']).first()
     if user:
         return jsonify({
             "email": user.email,
@@ -127,7 +127,7 @@ def create_checkout_session():
     plan_id = data.get('planId')
     
     user_identity = get_jwt_identity()
-    user = User.query.get(user_identity['id'])
+    user = User.query.filter_by(email=user_identity['email']).first()
 
     if not user or not user.stripe_customer_id:
         return jsonify({"msg": "Utilizador ou cliente de pagamento não encontrado."}), 404
@@ -173,17 +173,22 @@ def stripe_webhook():
             user = User.query.get(user_id)
             if user:
                 # Obtém o ID do preço da subscrição
-                line_item = session.get('line_items', {}).get('data', [{}])[0]
-                price_id = line_item.get('price', {}).get('id')
+                # Esta lógica pode precisar de ajuste dependendo da sua configuração exata no Stripe
+                try:
+                    line_items = stripe.checkout.Session.list_line_items(session.id, limit=1)
+                    price_id = line_items.data[0].price.id
+                    
+                    # Atualiza o tier do utilizador com base no plano subscrito
+                    if price_id == app.config['STRIPE_BASIC_PLAN_ID']:
+                        user.tier = 'basico'
+                    elif price_id == app.config['STRIPE_PRO_PLAN_ID']:
+                        user.tier = 'profissional'
+                    
+                    db.session.commit()
+                    print(f"Utilizador {user.email} atualizado para o tier {user.tier}")
+                except Exception as e:
+                    print(f"Erro ao processar webhook para a sessão {session.id}: {str(e)}")
 
-                # Atualiza o tier do utilizador com base no plano subscrito
-                if price_id == app.config['STRIPE_BASIC_PLAN_ID']:
-                    user.tier = 'basico'
-                elif price_id == app.config['STRIPE_PRO_PLAN_ID']:
-                    user.tier = 'profissional'
-                
-                db.session.commit()
-                print(f"Utilizador {user.email} atualizado para o tier {user.tier}")
 
     return 'Success', 200
 
@@ -194,4 +199,5 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Esta parte é para rodar localmente. O Render/Gunicorn usará o objeto 'app'.
+    app.run(debug=False, port=5000)
