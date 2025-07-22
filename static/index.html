@@ -30,15 +30,17 @@
         <!-- Navegação Superior -->
         <nav class="flex justify-between items-center mb-8">
             <h1 class="text-2xl font-bold text-white"><a href="#" id="home-link">PromptGenius</a></h1>
-            <div id="auth-links" class="flex items-center space-x-4">
-                <button id="login-nav-button" class="text-gray-300 hover:text-white">Login</button>
-                <button id="register-nav-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Cadastre-se</button>
-            </div>
-            <div id="user-info" class="hidden-view items-center space-x-4">
-                <span id="user-email" class="text-gray-300"></span>
-                <span id="user-tier-badge" class="bg-blue-500 text-white text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full"></span>
-                <button id="pricing-nav-button" class="text-gray-300 hover:text-white">Planos</button>
-                <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair</button>
+            <div class="flex items-center space-x-4">
+                <div id="auth-links" class="flex items-center space-x-4">
+                    <button id="login-nav-button" class="text-gray-300 hover:text-white">Login</button>
+                    <button id="register-nav-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Cadastre-se</button>
+                </div>
+                <div id="user-info" class="items-center space-x-4">
+                    <span id="user-email" class="text-gray-300"></span>
+                    <span id="user-tier-badge" class="bg-blue-500 text-white text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full"></span>
+                    <button id="pricing-nav-button" class="text-gray-300 hover:text-white">Planos</button>
+                    <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Sair</button>
+                </div>
             </div>
         </nav>
 
@@ -220,19 +222,20 @@
                         const userData = await response.json();
                         state.currentUser = userData;
                         
-                        authLinks.classList.add('hidden-view');
-                        userInfo.classList.remove('hidden-view');
+                        // CORREÇÃO: Usar style.display para garantir a visibilidade correta
+                        authLinks.style.display = 'none';
+                        userInfo.style.display = 'flex';
                         userEmailSpan.textContent = state.currentUser.email;
                         userTierBadge.textContent = state.currentUser.tier;
                         showView('generator');
                     } catch (error) {
                         console.error("Erro ao validar token:", error);
-                        alert("A sua sessão expirou ou ocorreu um erro. Por favor, faça login novamente.");
-                        handleLogout();
+                        handleLogout(); // Faz logout se o token for inválido
                     }
                 } else {
-                    authLinks.classList.remove('hidden-view');
-                    userInfo.classList.add('hidden-view');
+                    // CORREÇÃO: Usar style.display para garantir a visibilidade correta
+                    authLinks.style.display = 'flex';
+                    userInfo.style.display = 'none';
                     showView('login');
                 }
             }
@@ -349,7 +352,6 @@
             const advancedToggle = document.getElementById('advanced-toggle');
 
             function initGenerator() {
-                // Limpa opções antigas para evitar duplicados
                 platformSelect.innerHTML = '';
                 db.platforms.forEach(p => {
                     const option = document.createElement('option');
@@ -358,7 +360,6 @@
                     platformSelect.appendChild(option);
                 });
                 
-                // Limpa abas e conteúdo antigos
                 tabsContainer.innerHTML = '';
                 tabsContent.innerHTML = '';
 
